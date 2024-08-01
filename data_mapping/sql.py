@@ -2,14 +2,34 @@ import os
 import pandas as pd
 from databricks import sql
 
-HOST = "HOST"
-AUM = "AUM"
-ACCESS_TOKEN = "ACCESS_TOKEN"
+from dotenv import load_dotenv
+import os
+from datetime import datetime
+
+# Load variables from .env file
+load_dotenv()
+
+def format_YYYYMMDDHHMMSS(dt: datetime) -> str:
+    return dt.strftime('%Y%m%d%H%M%S')
+
+
+# Access the variables
+HOST = os.getenv("HOST")
+AUM = os.getenv("AUM")
+ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
+EDL_Master_List_Output_Path = os.getenv("EDL_Master_List_Output_Path")
+now_str = format_YYYYMMDDHHMMSS(datetime.now())
+fp = os.path.join(EDL_Master_List_Output_Path, f"EDL_Master_{now_str}.xlsx")
+
+
+print("Host:", HOST)
+print("AUM:", AUM)
+print("Output file path", fp)
 
 connection = sql.connect(
-    server_hostname = HOST,
-    http_path = AUM,
-    access_token = ACCESS_TOKEN
+    server_hostname=HOST,
+    http_path=AUM,
+    access_token=ACCESS_TOKEN
 )
 
 cursor = connection.cursor()
@@ -31,7 +51,7 @@ result = cursor.fetchall()
 df = pd.DataFrame(result, columns=[desc[0] for desc in cursor.description])
 # df1 = pd.DataFrame(result1, columns=[desc[0] for desc in cursor1.description])
 
-df.to_excel('/Users/your_location/DATA_MAPPING_CODE/LOCAL-TA-CODE-AND-FUND-CLASS-CODE-MAPPING/excel/edl_databrick.xlsx', sheet_name= 'edl_databricks', index=True)
+df.to_excel(fp, sheet_name='edl_databricks', index=True)
 
 
 cursor.close()
