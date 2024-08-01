@@ -17,9 +17,10 @@ def format_YYYYMMDDHHMMSS(dt: datetime) -> str:
 HOST = os.getenv("HOST")
 AUM = os.getenv("AUM")
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
-EDL_Master_List_Output_Path = os.getenv("EDL_Master_List_Output_Path")
+Root_Folder_Path = os.getenv("Root_Folder_Path")
+EDL_Master_List_Output_Folder = os.getenv("EDL_Master_List_Output_Folder")
 now_str = format_YYYYMMDDHHMMSS(datetime.now())
-fp = os.path.join(EDL_Master_List_Output_Path, f"EDL_Master_{now_str}.xlsx")
+fp = os.path.join(Root_Folder_Path, EDL_Master_List_Output_Folder, f"EDL_Master_{now_str}.xlsx")
 
 
 print("Host:", HOST)
