@@ -1,3 +1,4 @@
+import subprocess
 import numpy as np
 import pandas as pd
 import os
@@ -7,9 +8,19 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from dotenv import load_dotenv
 from libs import format_YYYYMMDDHHMMSS
+import pytz
 
 load_dotenv()
 
+excel_file_path = 'excel_file_path'
+export_edl_funds_path = 'export_edl_funds_path'
+if not os.path.exists(excel_file_path):
+    print(f"{excel_file_path} does not exist. Running {export_edl_funds_path} to generate the file")
+    try:
+        subprocess.run(['python', export_edl_funds_path], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to run {export_edl_funds_path}: {e}")
+        exit(1)
 
 Root_Folder_Path = os.getenv("Root_Folder_Path")
 L.info(f"Root_Folder_Path: {Root_Folder_Path}")
@@ -130,35 +141,12 @@ df_eFin = df_raw_eFinance_Master[~df_raw_eFinance_Master['TAScopeCode'].isin(eFi
 
 databricks_df = pd.read_excel(EDL_Master_List_Full_Path)
 
-# ta_codes = df_eFin['local_ta_code'].tolist()
-# databricks_filtered_df = databricks_df[databricks_df['fund_class_code_1'].isin(ta_codes)]
-
-merged_df = pd.merge(df_eFin, databricks_df, left_on='efinance_unique_key', right_on='edl_unique_key', how='left')
-
-mapping_df = merged_df[['efinance_unique_key', 'edl_unique_key', 'local_ta_code', 'fund_class_code_1']]
-
-unique_values = mapping_df.drop_duplicates()
-
 databricks_df.to_excel(Fund_Code_Mapping_FilePath, sheet_name='EDL_Funds', index=False)
 
 with pd.ExcelWriter(Fund_Code_Mapping_FilePath, engine='openpyxl', mode='a') as writer:
     df_eFin.to_excel(writer, sheet_name='eFinance_Funds', index=False)
-    mapping_df.to_excel(writer, sheet_name='Compare', index=False)
 
 wb = load_workbook(Fund_Code_Mapping_FilePath)
 ws = wb['Compare']
 
-# fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-# for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=3, max_col=3):
-#     for cell in row:
-#         if cell.value in unique_values['fund_class_code_1'].values:
-#             cell.fill = fill
-
 wb.save(Fund_Code_Mapping_FilePath)
-
-# ws = wb['eFinance_Funds']
-# ws['F1'] = 'Comparison Result'
-# for i in range(2, len(df_eFin) + 2):
-#     ws[f'F{i}'] = f'=IFERROR(VLOOKUP(A{i}, mapping!A:B, 2, FALSE), "ZZ")'
-
-# wb.save(Fund_Code_Mapping_FilePath)
