@@ -2,9 +2,9 @@ import os
 import pandas as pd
 from databricks import sql
 
-HOST = "HOST"
-AUM = "AUM"
-ACCESS_TOKEN = "ACCESS_TOKEN"
+HOST = ''
+AUM = ''
+ACCESS_TOKEN = ''
 
 connection = sql.connect(
     server_hostname = HOST,
@@ -17,10 +17,31 @@ cursor = connection.cursor()
 
 cursor.execute(
 """
-SELECT DISTINCT fund_class_code_1, liability_portf_code, liability_portf_name,
-country_of_domicile_code, owner_type
-FROM `hive_metastore`.`inv_dal_eod`.`cube_portfolios`
-WHERE country_of_domicile_code IN ('BB', 'HK', 'PH', 'TW', 'SG', 'MM', 'KR', 'CN', 'MY', 'TH', 'VN', 'IN', 'KH', 'ID', 'JP');
+WITH RankedData AS (
+    SELECT
+        effective_date,
+        fund_class_code_1,
+        liability_portf_code,
+        liability_portf_name,
+        country_of_domicile_code,
+        ROW_NUMBER() OVER (PARTITION BY liability_portf_name, fund_class_code_1, country_of_domicile_code ORDER BY effective_date DESC) AS rn
+    FROM
+        `hive_metastore`.`inv_dal_eod`.`cube_portfolios`
+    WHERE
+        (fund_class_code_1 IS NOT NULL) AND (liability_portf_name IS NOT NULL) AND (country_of_domicile_code NOT IN ('US', 'CA'))
+)
+SELECT
+    fund_class_code_1,
+    liability_portf_code,
+    liability_portf_name,
+    country_of_domicile_code,
+    effective_date
+FROM
+    RankedData
+WHERE
+    rn = 1
+ORDER BY
+    liability_portf_name, fund_class_code_1, country_of_domicile_code;
 """
 )
 
@@ -29,9 +50,10 @@ result = cursor.fetchall()
 # print("Show result", result)
 
 df = pd.DataFrame(result, columns=[desc[0] for desc in cursor.description])
+df['effective_date'] = pd.to_datetime(df['effective_date']).dt.tz_localize(None).dt.strftime('%Y-%m-%d')
 # df1 = pd.DataFrame(result1, columns=[desc[0] for desc in cursor1.description])
 
-df.to_excel('/Users/your_location/DATA_MAPPING_CODE/LOCAL-TA-CODE-AND-FUND-CLASS-CODE-MAPPING/excel/edl_databrick.xlsx', sheet_name= 'edl_databricks', index=True)
+df.to_excel('/Users/urakodz/Downloads/DATA_MAPPING_CODE/LOCAL-TA-CODE-AND-FUND-CLASS-CODE-MAPPING/excel/edl_databricks.xlsx', index=True)
 
 
 cursor.close()
