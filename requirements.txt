@@ -1,3 +1,4 @@
+pip==24.2
 certifi==2024.7.4
 charset-normalizer==3.3.2
 databricks==0.2
@@ -18,3 +19,4 @@ thrift==0.20.0
 tzdata==2024.1
 urllib3==2.2.2
 python-dotenv==1.0.1
+loguru==0.7.2
