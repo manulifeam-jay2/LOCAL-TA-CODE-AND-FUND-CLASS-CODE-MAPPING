@@ -7,20 +7,20 @@ from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from dotenv import load_dotenv
-from libs import format_YYYYMMDDHHMMSS
+from libs import auto_adjust_column_widths, format_YYYYMMDDHHMMSS
 import pytz
 
 load_dotenv()
 
-excel_file_path = 'excel_file_path'
-export_edl_funds_path = 'export_edl_funds_path'
-if not os.path.exists(excel_file_path):
-    print(f"{excel_file_path} does not exist. Running {export_edl_funds_path} to generate the file")
-    try:
-        subprocess.run(['python', export_edl_funds_path], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to run {export_edl_funds_path}: {e}")
-        exit(1)
+# excel_file_path = 'excel_file_path'
+# export_edl_funds_path = 'export_edl_funds_path'
+# if not os.path.exists(excel_file_path):
+#     print(f"{excel_file_path} does not exist. Running {export_edl_funds_path} to generate the file")
+#     try:
+#         subprocess.run(['python', export_edl_funds_path], check=True)
+#     except subprocess.CalledProcessError as e:
+#         print(f"Failed to run {export_edl_funds_path}: {e}")
+#         exit(1)
 
 Root_Folder_Path = os.getenv("Root_Folder_Path")
 L.info(f"Root_Folder_Path: {Root_Folder_Path}")
@@ -35,10 +35,10 @@ L.info(f"EDL_Master_List_Full_Path: {EDL_Master_List_Full_Path}")
 
 now_str = format_YYYYMMDDHHMMSS(datetime.now())
 Fund_Code_Mapping_FilePath = os.path.join(Root_Folder_Path, EDL_Master_List_Output_Folder, f"Fund_Code_Mapping_Compare_EDL_eFinance_{now_str}.xlsx")
-print("Fund_Code_Mapping_FilePath", Fund_Code_Mapping_FilePath)
+L.info("Fund_Code_Mapping_FilePath", Fund_Code_Mapping_FilePath)
 
 
-df_raw_eFinance_Master = pd.read_excel(eFinance_Master_List_Full_Path)
+df_raw_eFinance_Master = pd.read_excel(eFinance_Master_List_Full_Path, sheet_name='Data')
 
 # eFinance_exclude_platform_code_list = [
 # 'BB_GA',
@@ -97,6 +97,13 @@ df_raw_eFinance_Master = pd.read_excel(eFinance_Master_List_Full_Path)
 # np.nan
 # ]
 eFinance_exclude_TA_Scope_list = [
+    'BASE',
+    'BB_GA',
+    'HK_MIT',
+    'IN_MAHINDRA',
+    'MY_INST',
+    'VN_ILP',
+    #
     'CH_INST',
     'CH_WOFE',
     'HK_ADV',
@@ -136,17 +143,27 @@ eFinance_exclude_TA_Scope_list = [
 ]
 # Filter out eFinance TA scopes
 
-df_raw_eFinance_Master['efinance_unique_key'] = df_raw_eFinance_Master['ISO2CountryCode'] + '_' + df_raw_eFinance_Master['local_ta_code']
+# df_raw_eFinance_Master['efinance_unique_key'] = df_raw_eFinance_Master['ISO2CountryCode'] + '_' + df_raw_eFinance_Master['local_ta_code']
 df_eFin = df_raw_eFinance_Master[~df_raw_eFinance_Master['TAScopeCode'].isin(eFinance_exclude_TA_Scope_list)]
 
 databricks_df = pd.read_excel(EDL_Master_List_Full_Path)
+
+merged_df = pd.merge(df_eFin, databricks_df, left_on='efin_edl_align_unique_key', right_on='edl_unique_key', how='left')
+
+mapping_df = merged_df[['efin_edl_align_unique_key', 'edl_unique_key', 'TAScopeCode', 'efin_edl_align_ta_code', 'edl_fund_class_code_1', 'LastProvideDate', 'Year2023Flag']]
+
+unique_values = mapping_df.drop_duplicates()
 
 databricks_df.to_excel(Fund_Code_Mapping_FilePath, sheet_name='EDL_Funds', index=False)
 
 with pd.ExcelWriter(Fund_Code_Mapping_FilePath, engine='openpyxl', mode='a') as writer:
     df_eFin.to_excel(writer, sheet_name='eFinance_Funds', index=False)
+    mapping_df.to_excel(writer, sheet_name='Compare', index=False)
 
 wb = load_workbook(Fund_Code_Mapping_FilePath)
 ws = wb['Compare']
 
 wb.save(Fund_Code_Mapping_FilePath)
+
+auto_adjust_column_widths(Fund_Code_Mapping_FilePath)
+L.info(f"Done. {Fund_Code_Mapping_FilePath}")

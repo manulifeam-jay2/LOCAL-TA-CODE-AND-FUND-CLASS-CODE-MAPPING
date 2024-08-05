@@ -29,19 +29,31 @@ connection = sql.connect(
 )
 
 query_sql = """
-    SELECT DISTINCT 
-        portfolio_group_code as edl_portfolio_group_code,
-        portfolio_group_name as edl_portfolio_group_name,
-        liability_portf_code as edl_liability_portf_code, 
-        liability_portf_name as edl_liability_portf_name,
-        fund_class_code_1 as edl_fund_class_code_1, 
-        fund_class_code_2 as edl_fund_class_code_2, 
-        country_of_domicile_code as edl_country_of_domicile_code,
-        owner_type as edl_owner_type,
-        CONCAT(country_of_domicile_code, '_', fund_class_code_1) AS edl_unique_key
-    FROM `hive_metastore`.`inv_dal_eod`.`cube_portfolios`
-    WHERE fund_class_code_1 <> '' 
-    AND country_of_domicile_code IN ('BB', 'HK', 'PH', 'TW', 'SG', 'MM', 'KR', 'CN', 'MY', 'TH', 'VN', 'IN', 'KH', 'ID', 'JP');
+    WITH RankedDatesData AS (
+        SELECT 
+            fund_class_code_1, 
+            liability_portf_code, 
+            liability_portf_name,
+            country_of_domicile_code, 
+            owner_type,
+            portfolio_group_code,
+            portfolio_group_name,
+            ROW_NUMBER() OVER (PARTITION BY liability_portf_code ORDER BY effective_date DESC) AS rn
+        FROM `hive_metastore`.`inv_dal_eod`.`cube_portfolios`
+        WHERE country_of_domicile_code IN ('BB', 'HK', 'PH', 'TW', 'SG', 'MM', 'KR', 'CN', 'MY', 'TH', 'VN', 'IN', 'KH', 'ID', 'JP')
+        AND liability_portf_code <> ''
+    )
+    SELECT 
+        CONCAT(country_of_domicile_code, '_', fund_class_code_1) AS edl_unique_key,
+        fund_class_code_1 AS edl_fund_class_code_1, 
+        liability_portf_code AS edl_liability_portf_code,  
+        liability_portf_name AS edl_liability_portf_name,
+        country_of_domicile_code AS edl_country_of_domicile_code, 
+        owner_type AS edl_owner_type, 
+        portfolio_group_code AS edl_portfolio_group_code, 
+        portfolio_group_name AS edl_portfolio_group_name
+    FROM RankedDatesData
+    WHERE rn = 1
 """
 
 with connection.cursor() as cursor:
