@@ -33,5 +33,5 @@ def auto_adjust_column_widths(excel_file_path: str, extra_space: int = 1) -> Non
 
     wb.save(excel_file_path)
 
-def format_YYYYMMDDHHMMSS(dt: datetime) -> str:
-    return dt.strftime('%Y%m%d%H%M%S')
+def format_YYYYMMDD(dt: datetime) -> str:
+    return dt.strftime('%Y%m%d')
